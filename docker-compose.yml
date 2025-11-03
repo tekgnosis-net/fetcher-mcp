@@ -1,6 +1,6 @@
 services:
   fetcher-mcp:
-  image: ghcr.io/tekgnosis-net/fetcher-mcp:latest
+    image: ghcr.io/tekgnosis-net/fetcher-mcp:latest
     container_name: fetcher-mcp
     restart: unless-stopped
     ports:
