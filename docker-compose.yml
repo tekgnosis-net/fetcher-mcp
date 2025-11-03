@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   fetcher-mcp:
-    image: ghcr.io/jae-jae/fetcher-mcp:latest
+  image: ghcr.io/tekgnosis-net/fetcher-mcp:latest
     container_name: fetcher-mcp
     restart: unless-stopped
     ports:

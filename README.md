@@ -1,20 +1,21 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/jae-jae/fetcher-mcp/refs/heads/main/icon.svg" width="100" height="100" alt="Fetcher MCP Icon" />
+  <img src="https://raw.githubusercontent.com/tekgnosis-net/fetcher-mcp/refs/heads/main/icon.svg" width="100" height="100" alt="Fetcher MCP Icon" />
 </div>
 
-[中文](https://www.readme-i18n.com/jae-jae/fetcher-mcp?lang=zh) |
-[Deutsch](https://www.readme-i18n.com/jae-jae/fetcher-mcp?lang=de) |
-[Español](https://www.readme-i18n.com/jae-jae/fetcher-mcp?lang=es) |
-[français](https://www.readme-i18n.com/jae-jae/fetcher-mcp?lang=fr) |
-[日本語](https://www.readme-i18n.com/jae-jae/fetcher-mcp?lang=ja) |
-[한국어](https://www.readme-i18n.com/jae-jae/fetcher-mcp?lang=ko) |
-[Português](https://www.readme-i18n.com/jae-jae/fetcher-mcp?lang=pt) |
-[Русский](https://www.readme-i18n.com/jae-jae/fetcher-mcp?lang=ru)
+[中文](https://www.readme-i18n.com/tekgnosis-net/fetcher-mcp?lang=zh) |
+[Deutsch](https://www.readme-i18n.com/tekgnosis-net/fetcher-mcp?lang=de) |
+[Español](https://www.readme-i18n.com/tekgnosis-net/fetcher-mcp?lang=es) |
+[français](https://www.readme-i18n.com/tekgnosis-net/fetcher-mcp?lang=fr) |
+[日本語](https://www.readme-i18n.com/tekgnosis-net/fetcher-mcp?lang=ja) |
+[한국어](https://www.readme-i18n.com/tekgnosis-net/fetcher-mcp?lang=ko) |
+[Português](https://www.readme-i18n.com/tekgnosis-net/fetcher-mcp?lang=pt) |
+[Русский](https://www.readme-i18n.com/tekgnosis-net/fetcher-mcp?lang=ru)
 
 # Fetcher MCP
 
-MCP server for fetch web page content using Playwright headless browser.
+MCP server for fetch web page content and multi-query Google search using Playwright headless browser.
 
+> This project is modified from [fetcher-mcp](https://github.com/jae-jae/fetcher-mcp), and combines the additional [google-search-mcp](https://github.com/jae-jae/google-search-mcp) project for enhanced search capabilities within the same docker image.
 > 🌟 **Recommended**: [OllaMan](https://ollaman.com/) - Powerful Ollama AI Model Manager.
 
 ## Advantages
@@ -26,6 +27,8 @@ MCP server for fetch web page content using Playwright headless browser.
 - **Flexible Output Format**: Supports both HTML and Markdown output formats, making it easy to integrate with various downstream applications.
 
 - **Parallel Processing**: The `fetch_urls` tool enables concurrent fetching of multiple URLs, significantly improving efficiency for batch operations.
+
+- **Google Search Automation**: The `search` tool reuses stealth browser sessions to fan out multi-keyword Google queries while persisting fingerprint state to limit CAPTCHAs.
 
 - **Resource Optimization**: Automatically blocks unnecessary resources (images, stylesheets, fonts, media) to reduce bandwidth usage and improve performance.
 
@@ -94,7 +97,7 @@ On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
 ### Running with Docker
 
 ```bash
-docker run -p 3000:3000 ghcr.io/jae-jae/fetcher-mcp:latest
+docker run -p 3000:3000 ghcr.io/tekgnosis-net/fetcher-mcp:latest
 ```
 
 ### Deploying with Docker Compose
@@ -106,7 +109,7 @@ version: "3.8"
 
 services:
   fetcher-mcp:
-    image: ghcr.io/jae-jae/fetcher-mcp:latest
+    image: ghcr.io/tekgnosis-net/fetcher-mcp:latest
     container_name: fetcher-mcp
     restart: unless-stopped
     ports:
@@ -156,6 +159,17 @@ docker-compose up -d
   - Supports the following parameters:
     - `urls`: Array of URLs to fetch (required parameter)
     - Other parameters are the same as `fetch_url`
+
+- `search` - Perform Google searches for one or more queries with anti-bot protections
+  - Shares a single Chromium session for multi-query runs to mimic human behaviour
+  - Saves fingerprint and storage state per query to reduce CAPTCHAs and rate limits
+  - Supports the following parameters:
+    - `queries`: Array of search keywords to execute (required parameter)
+    - `limit`: Maximum number of results per query (default 10)
+    - `timeout`: Page load timeout in milliseconds (default 60000)
+    - `noSaveState`: Disable writing fingerprint/state files if set to true
+    - `locale`: Locale hint for result personalization (default `en-US`)
+    - `debug`: Enable headful Playwright mode for manual CAPTCHA handling
 
 - `browser_install` - Install Playwright Chromium browser binary automatically
 

@@ -219,7 +219,7 @@ export class WebContentProcessor {
           `${this.logPrefix} Could not extract main content, will use full HTML`
         );
       } else {
-        contentToProcess = article.content;
+        contentToProcess = article.content ?? article.textContent ?? "";
         logger.info(
           `${this.logPrefix} Successfully extracted main content, length: ${contentToProcess.length}`
         );
