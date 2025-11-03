@@ -1,19 +1,17 @@
-version: "3.8"
-
 services:
   fetcher-mcp:
   image: ghcr.io/tekgnosis-net/fetcher-mcp:latest
     container_name: fetcher-mcp
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "8098:3000"
     environment:
       - NODE_ENV=production
     # Using host network mode can improve browser access efficiency
     # network_mode: "host" # Use on Linux hosts for better performance
     volumes:
       # For Playwright, may need to share certain system paths
-      - /tmp:/tmp
+      - ./playwright:/tmp
     # Health check
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
