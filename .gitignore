@@ -4,3 +4,6 @@ build/
 .env*
 lightpanda
 .history/
+
+# Copilot instructions
+.github/copilot-instructions.md
