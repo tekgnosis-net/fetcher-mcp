@@ -299,6 +299,7 @@ node build/index.js --debug
 
 - [fetcher-mcp (upstream)](https://github.com/jae-jae/fetcher-mcp): The original project this fork is based on.
 - [google-search-mcp (upstream)](https://github.com/jae-jae/google-search-mcp): The upstream Google search MCP server whose functionality has been merged into this fork.
+- [g-search-mcp](https://github.com/tekgnosis-net/g-search-mcp): A powerful MCP server for Google search that enables parallel searching with multiple keywords simultaneously. Perfect for batch search operations and data collection.
 
 ## License
 
