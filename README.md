@@ -15,7 +15,7 @@
 
 MCP server for fetch web page content and multi-query Google search using Playwright headless browser.
 
-> This project is a fork of [fetcher-mcp](https://github.com/jae-jae/fetcher-mcp) by jae-jae, extended with Google Search automation and a range of performance and stability improvements for Docker deployments.
+> This project extends the original fetcher-mcp with Google Search automation and a range of performance and stability improvements for Docker deployments.
 
 ## Advantages
 
@@ -297,8 +297,6 @@ node build/index.js --debug
 
 ## Related Projects
 
-- [fetcher-mcp (upstream)](https://github.com/jae-jae/fetcher-mcp): The original project this fork is based on.
-- [google-search-mcp (upstream)](https://github.com/jae-jae/google-search-mcp): The upstream Google search MCP server whose functionality has been merged into this fork.
 - [g-search-mcp](https://github.com/tekgnosis-net/g-search-mcp): A powerful MCP server for Google search that enables parallel searching with multiple keywords simultaneously. Perfect for batch search operations and data collection.
 
 ## License
