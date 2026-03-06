@@ -4,6 +4,7 @@ build/
 .env*
 lightpanda
 .history/
-
-# Copilot instructions
+# Copilot instructions - kept as local-only, not committed to repo
 .github/copilot-instructions.md
+# Docker volume mount dir for Playwright container /tmp
+playwright/

@@ -102,21 +102,49 @@ export async function fetchUrls(args: any) {
     logger.debug(`Debug mode enabled for URLs: ${urls.join(", ")}`);
   }
 
+  // Cap concurrent pages to avoid exhausting memory when many URLs are given
+  const MAX_CONCURRENT_PAGES = 5;
+
   let browser: Browser | null = null;
   try {
+    // Generate viewport once — reused for both --window-size arg and context viewport
+    const viewport = browserService.generateViewport();
+
     // Create a stealth browser with anti-detection measures
-    browser = await browserService.createBrowser();
+    browser = await browserService.createBrowser(viewport);
     
     // Create a stealth browser context
-    const { context, viewport } = await browserService.createContext(browser);
+    const { context } = await browserService.createContext(browser, viewport);
 
     const processor = new WebContentProcessor(options, "[FetchURLs]");
 
-    const results = await Promise.all(
-      urls.map(async (url, index) => {
-        // Create a new page with human-like behavior
+    /**
+     * Run tasks with a concurrency limit — prevents spinning up all pages
+     * simultaneously when a large URL batch is provided.
+     */
+    async function runConcurrent<T>(
+      items: T[],
+      limit: number,
+      fn: (item: T, index: number) => Promise<FetchResult>
+    ): Promise<FetchResult[]> {
+      const results: FetchResult[] = [];
+      let i = 0;
+      async function worker() {
+        while (i < items.length) {
+          const idx = i++;
+          results[idx] = await fn(items[idx], idx);
+        }
+      }
+      const workers = Array.from({ length: Math.min(limit, items.length) }, worker);
+      await Promise.all(workers);
+      return results;
+    }
+
+    const results = await runConcurrent(
+      urls,
+      MAX_CONCURRENT_PAGES,
+      async (url, index) => {
         const page = await browserService.createPage(context, viewport);
-        
         try {
           const result = await processor.processPageContent(page, url);
           return { index, ...result } as FetchResult;
@@ -129,7 +157,7 @@ export async function fetchUrls(args: any) {
             logger.debug(`Page kept open for debugging. URL: ${url}`);
           }
         }
-      })
+      }
     );
 
     results.sort((a, b) => (a.index || 0) - (b.index || 0));

@@ -106,11 +106,14 @@ export async function fetchUrl(args: any) {
   }
 
   try {
+    // Generate viewport once — reused for both --window-size arg and context viewport
+    const viewport = browserService.generateViewport();
+
     // Create a stealth browser with anti-detection measures
-    browser = await browserService.createBrowser();
+    browser = await browserService.createBrowser(viewport);
     
     // Create a stealth browser context
-    const { context, viewport } = await browserService.createContext(browser);
+    const { context } = await browserService.createContext(browser, viewport);
 
     // Create a new page with human-like behavior
     page = await browserService.createPage(context, viewport);

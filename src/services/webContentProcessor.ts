@@ -7,10 +7,13 @@ import { logger } from "../utils/logger.js";
 export class WebContentProcessor {
   private options: FetchOptions;
   private logPrefix: string;
+  // Pre-instantiated once per processor — avoids re-creating on every fetch call
+  private readonly turndownService: TurndownService;
 
   constructor(options: FetchOptions, logPrefix: string = "") {
     this.options = options;
     this.logPrefix = logPrefix;
+    this.turndownService = new TurndownService();
   }
 
   async processPageContent(page: any, url: string): Promise<FetchResult> {
@@ -141,17 +144,23 @@ export class WebContentProcessor {
   // Added method: Ensure page stability
   private async ensurePageStability(page: any): Promise<void> {
     try {
-      // Check if there are ongoing network requests or navigation
-      await page.waitForFunction(
-        () => {
-          return window.document.readyState === 'complete';
-        }, 
-        { timeout: this.options.timeout }
-      );
-      
-      // Wait an extra short time to ensure page stability
-      await page.waitForTimeout(500);
-      
+      // Skip the redundant readyState check when waitUntil already guarantees it:
+      // 'load' and 'networkidle' both imply readyState === 'complete'.
+      // Only run the waitForFunction for 'domcontentloaded' and 'commit'.
+      const needsReadyStateCheck =
+        this.options.waitUntil === 'domcontentloaded' ||
+        this.options.waitUntil === 'commit';
+
+      if (needsReadyStateCheck) {
+        await page.waitForFunction(
+          () => window.document.readyState === 'complete',
+          { timeout: this.options.timeout }
+        );
+      }
+
+      // Short pause to let any post-load JS mutations settle
+      await page.waitForTimeout(200);
+
       logger.info(`${this.logPrefix} Page has stabilized`);
     } catch (error) {
       logger.warn(`${this.logPrefix} Error ensuring page stability: ${error instanceof Error ? error.message : String(error)}`);
@@ -167,14 +176,14 @@ export class WebContentProcessor {
     while (attempt < retries) {
       try {
         attempt++;
-        
-        // Get page title
-        pageTitle = await page.title();
+
+        // Fetch title and HTML in parallel — two independent browser calls
+        [pageTitle, html] = await Promise.all([
+          page.title() as Promise<string>,
+          page.content() as Promise<string>,
+        ]);
         logger.info(`${this.logPrefix} Page title: ${pageTitle}`);
-        
-        // Get HTML content
-        html = await page.content();
-        
+
         // If successfully retrieved, exit the loop
         return { pageTitle, html };
         
@@ -219,7 +228,8 @@ export class WebContentProcessor {
           `${this.logPrefix} Could not extract main content, will use full HTML`
         );
       } else {
-        contentToProcess = article.content ?? article.textContent ?? "";
+        // article.content is typed string | null | undefined; fall back to full HTML if absent
+        contentToProcess = article.content ?? html;
         logger.info(
           `${this.logPrefix} Successfully extracted main content, length: ${contentToProcess.length}`
         );
@@ -230,8 +240,7 @@ export class WebContentProcessor {
     let processedContent = contentToProcess;
     if (!this.options.returnHtml) {
       logger.info(`${this.logPrefix} Converting to Markdown`);
-      const turndownService = new TurndownService();
-      processedContent = turndownService.turndown(contentToProcess);
+      processedContent = this.turndownService.turndown(contentToProcess);
       logger.info(
         `${this.logPrefix} Successfully converted to Markdown, length: ${processedContent.length}`
       );

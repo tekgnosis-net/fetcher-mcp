@@ -6,6 +6,29 @@ import { FetchOptions } from "../types/index.js";
  * Service for managing browser instances with anti-detection features
  */
 export class BrowserService {
+  // Static pools — allocated once per process, not per request
+  private static readonly USER_AGENTS: string[] = [
+    // Chrome - Windows
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+    // Chrome - Mac
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+    // Firefox
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0",
+    // Safari
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15",
+  ];
+
+  private static readonly VIEWPORTS: { width: number; height: number }[] = [
+    { width: 1920, height: 1080 },
+    { width: 1366, height: 768 },
+    { width: 1536, height: 864 },
+    { width: 1440, height: 900 },
+    { width: 1280, height: 720 },
+  ];
+
   private options: FetchOptions;
   private isDebugMode: boolean;
 
@@ -27,37 +50,23 @@ export class BrowserService {
   }
 
   /**
-   * Generate a random user agent string
+   * Pick a random user agent string from the static pool
    */
   private getRandomUserAgent(): string {
-    const userAgents = [
-      // Chrome - Windows
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-      // Chrome - Mac
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-      // Firefox
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0",
-      // Safari
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
+    return BrowserService.USER_AGENTS[
+      Math.floor(Math.random() * BrowserService.USER_AGENTS.length)
     ];
-    return userAgents[Math.floor(Math.random() * userAgents.length)];
   }
 
   /**
-   * Generate a random viewport size
+   * Generate a single random viewport — call once and reuse for both
+   * chromium.launch (--window-size) and browser.newContext (viewport),
+   * so the browser window and context pixel dimensions always match.
    */
-  private getRandomViewport(): {width: number, height: number} {
-    const viewports = [
-      { width: 1920, height: 1080 },
-      { width: 1366, height: 768 },
-      { width: 1536, height: 864 },
-      { width: 1440, height: 900 },
-      { width: 1280, height: 720 },
+  public generateViewport(): { width: number; height: number } {
+    return BrowserService.VIEWPORTS[
+      Math.floor(Math.random() * BrowserService.VIEWPORTS.length)
     ];
-    return viewports[Math.floor(Math.random() * viewports.length)];
   }
 
   /**
@@ -128,60 +137,37 @@ export class BrowserService {
   }
 
   /**
-   * Create a new stealth browser instance
+   * Create a new stealth browser instance.
+   * Pass the viewport from generateViewport() so --window-size matches
+   * the context viewport set in createContext().
    */
-  public async createBrowser(): Promise<Browser> {
-    const viewport = this.getRandomViewport();
-
-    try {
-      return await chromium.launch({
-        headless: !this.isDebugMode,
-        args: [
-          '--disable-blink-features=AutomationControlled',
-          '--disable-features=IsolateOrigins,site-per-process',
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-webgl',
-          '--disable-infobars',
-          '--window-size=' + viewport.width + ',' + viewport.height,
-          '--disable-extensions'
-        ]
-      });
-    } catch (error: any) {
-      // Check if the error is related to missing browser installation
-      if (this.isBrowserNotInstalledError(error)) {
-        const enhancedError = new Error(
-          `Browser not installed. ${error.message}\n\n` +
-          `💡 To fix this issue, please call the 'browser_install' tool to install the required browser binaries.`
-        );
-        enhancedError.name = 'BrowserNotInstalledError';
-        throw enhancedError;
-      }
-      throw error;
-    }
+  public async createBrowser(viewport: { width: number; height: number }): Promise<Browser> {
+    return await chromium.launch({ 
+      headless: !this.isDebugMode,
+      args: [
+        '--disable-blink-features=AutomationControlled',
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        // Required for Docker: prevents GPU-related crashes in headless containers
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+        // Disables the zygote launcher process which can crash inside Docker namespaces
+        '--no-zygote',
+        '--disable-webgl',
+        '--disable-infobars',
+        '--window-size=' + viewport.width + ',' + viewport.height,
+        '--disable-extensions'
+      ]
+    });
   }
 
   /**
-   * Check if error is related to browser not being installed
+   * Create a new browser context with stealth configurations.
+   * Accepts the same viewport used in createBrowser() to keep dimensions consistent.
    */
-  private isBrowserNotInstalledError(error: any): boolean {
-    const errorMessage = error.message?.toLowerCase() || '';
-
-    return errorMessage.includes('executable doesn\'t exist') ||
-           errorMessage.includes('browser not found') ||
-           errorMessage.includes('could not find browser') ||
-           errorMessage.includes('failed to launch browser') ||
-           errorMessage.includes('browser executable not found') ||
-           errorMessage.includes('chromium browser not found');
-  }
-
-  /**
-   * Create a new browser context with stealth configurations
-   */
-  public async createContext(browser: Browser): Promise<{ context: BrowserContext, viewport: {width: number, height: number} }> {
-    const viewport = this.getRandomViewport();
-    
+  public async createContext(browser: Browser, viewport: { width: number; height: number }): Promise<{ context: BrowserContext, viewport: {width: number, height: number} }> {
     const context = await browser.newContext({
       javaScriptEnabled: true,
       ignoreHTTPSErrors: true,

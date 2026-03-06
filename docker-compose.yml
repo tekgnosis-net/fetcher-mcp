@@ -9,6 +9,9 @@ services:
       - NODE_ENV=production
     # Using host network mode can improve browser access efficiency
     # network_mode: "host" # Use on Linux hosts for better performance
+    # Shared memory size for Chromium — Docker default (64MB) causes page crashes on
+    # heavy JS pages (Fandom, Forbes, etc.). Chromium uses /dev/shm for renderer IPC.
+    shm_size: '2g'
     volumes:
       # For Playwright, may need to share certain system paths
       - ./playwright:/tmp
