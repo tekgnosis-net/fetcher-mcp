@@ -15,8 +15,7 @@
 
 MCP server for fetch web page content and multi-query Google search using Playwright headless browser.
 
-> This project is modified from [fetcher-mcp](https://github.com/jae-jae/fetcher-mcp), and combines the additional [google-search-mcp](https://github.com/jae-jae/google-search-mcp) project for enhanced search capabilities within the same docker image.
-> 🌟 **Recommended**: [OllaMan](https://ollaman.com/) - Powerful Ollama AI Model Manager.
+> This project is a fork of [fetcher-mcp](https://github.com/jae-jae/fetcher-mcp) by jae-jae, extended with Google Search automation and a range of performance and stability improvements for Docker deployments.
 
 ## Advantages
 
@@ -26,15 +25,17 @@ MCP server for fetch web page content and multi-query Google search using Playwr
 
 - **Flexible Output Format**: Supports both HTML and Markdown output formats, making it easy to integrate with various downstream applications.
 
-- **Parallel Processing**: The `fetch_urls` tool enables concurrent fetching of multiple URLs, significantly improving efficiency for batch operations.
+- **Parallel Processing**: The `fetch_urls` tool concurrently fetches multiple URLs (capped at 5 simultaneous pages) to balance throughput against memory usage.
 
 - **Google Search Automation**: The `search` tool reuses stealth browser sessions to fan out multi-keyword Google queries while persisting fingerprint state to limit CAPTCHAs.
 
 - **Resource Optimization**: Automatically blocks unnecessary resources (images, stylesheets, fonts, media) to reduce bandwidth usage and improve performance.
 
-- **Robust Error Handling**: Comprehensive error handling and logging ensure reliable operation even when dealing with problematic web pages.
+- **Robust Error Handling**: Comprehensive error handling and logging ensure reliable operation even when dealing with problematic web pages. On navigation timeout, partial page content is still extracted and returned.
 
 - **Configurable Parameters**: Fine-grained control over timeouts, content extraction, and output formatting to suit different use cases.
+
+- **Crash-Resistant Docker Deployment**: Ships with hardened Chromium launch flags (`--disable-gpu`, `--no-zygote`, `--disable-software-rasterizer`) and requires `shm_size: '2g'` to prevent renderer crashes on heavy JavaScript pages.
 
 ## Quick Start
 
@@ -102,26 +103,24 @@ docker run -p 3000:3000 ghcr.io/tekgnosis-net/fetcher-mcp:latest
 
 ### Deploying with Docker Compose
 
-Create a `docker-compose.yml` file:
-
 ```yaml
-version: "3.8"
-
 services:
   fetcher-mcp:
     image: ghcr.io/tekgnosis-net/fetcher-mcp:latest
     container_name: fetcher-mcp
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "8098:3000"
     environment:
       - NODE_ENV=production
-    # Using host network mode on Linux hosts can improve browser access efficiency
-    # network_mode: "host"
+    # shm_size is REQUIRED — Docker's default 64 MB /dev/shm is too small for
+    # Chromium's inter-process shared memory on heavy JS pages (SPAs, media-rich
+    # sites). Without it, page.goto crashes with "Page crashed" immediately.
+    shm_size: '2g'
     volumes:
-      # For Playwright, may need to share certain system paths
-      - /tmp:/tmp
-    # Health check
+      - ./playwright:/tmp
+    # Using host network mode can improve browser access efficiency on Linux
+    # network_mode: "host"
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
       interval: 30s
@@ -132,8 +131,13 @@ services:
 Then run:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
+
+> **Important:** The `shm_size: '2g'` key is **required**. Omitting it causes Chromium renderer
+> processes to crash instantly on JavaScript-heavy pages, producing `page.goto: Page crashed`
+> errors in the logs. The `--disable-dev-shm-usage` Chromium flag alone is not sufficient for
+> complex SPAs and media-heavy pages.
 
 ## Features
 
@@ -293,7 +297,8 @@ node build/index.js --debug
 
 ## Related Projects
 
-- [g-search-mcp](https://github.com/jae-jae/g-search-mcp): A powerful MCP server for Google search that enables parallel searching with multiple keywords simultaneously. Perfect for batch search operations and data collection.
+- [fetcher-mcp (upstream)](https://github.com/jae-jae/fetcher-mcp): The original project this fork is based on.
+- [google-search-mcp (upstream)](https://github.com/jae-jae/google-search-mcp): The upstream Google search MCP server whose functionality has been merged into this fork.
 
 ## License
 
